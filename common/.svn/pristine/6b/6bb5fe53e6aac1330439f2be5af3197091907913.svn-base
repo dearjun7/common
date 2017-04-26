@@ -1,0 +1,8 @@
+package com.hs.gms.std.common.service.i18n;
+
+public enum SupportedLocaleLang {
+    ko,
+    ja,
+    zh,
+    en
+}

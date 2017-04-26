@@ -1,0 +1,100 @@
+package com.hs.gms.std.common.security.xss;
+
+import junit.framework.Assert;
+
+import org.junit.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import com.hs.gms.std.common.service.http.core.XSSHttpRequest;
+
+@SuppressWarnings("deprecation")
+public class TestXSSRequestWrapper {
+
+    @Test
+    public void testHighLevel() {
+        MockHttpServletRequest mockRequest = new MockHttpServletRequest();
+
+        int idx = 1;
+        mockRequest.addParameter("1", "1: 공격 코드 유형은 <script>alert(\"test\");</script> 이며, 단순 HTML인 <title>\"이런+'유형'=한글!\"</title>도 있습니다.");
+        mockRequest.addParameter("2", "2: <script>alert(\"test\");</script>");
+        mockRequest.addParameter("3",
+                "3: ==]]><html:html+xmlns:html='http://www.w3.org/1999/xhtml'><html:h1>hacked+page</html:h1><html:script>alert('javascript+test');</html:script></html:html></Tracking><Tracking><![CDATA[]");
+        mockRequest.addParameter("4",
+                "4: ==]]><html:html+xmlns:html='http://www.w3.org/1999/xhtml'><html:h1>hacked+page</html:h1><html:script>alert('javascript+test');</html:script><iframe src=''></iframe></html:html></Tracking><Tracking><![CDATA[]");
+        mockRequest.addParameter("5", "5: <script>");
+        mockRequest.addParameter("6", "6: </script>");
+        mockRequest.addParameter("7", "7: </html:script>");
+        mockRequest.addParameter("8", "8: </html: script>");
+        mockRequest.addParameter("9", "9: <img src=\"\njavascript:alert('test')' alt='test'>");
+        mockRequest.addParameter("10", "10: <img src=\"\nvbscript:alert('test')' alt='test'>");
+        mockRequest.addParameter("11", "11: <IMG SRC=javascript:alert(\"XSS\")>");
+        mockRequest.addParameter("12", "12: <IMG SRC=`javascript:alert(\"RSnake says, 'XSS'\")`>");
+        mockRequest.addParameter("13", "13: <IMG \"\"\"><SCRIPT>alert(\"XSS\")</SCRIPT>\">");
+        mockRequest.addParameter("14", "14: <SCRIPT>alert(\"test\");</SCRIPT>");
+        mockRequest.addParameter("15", "15: <SCRIPT type=\"text/javascript\">alert(\"test\");</SCRIPT>");
+        mockRequest.addParameter("16", "16: <script type=\"text/javascript\">alert(\"test\");</script>");
+        mockRequest.addParameter("17", "17: <IFRAME SRC=\"javascript:alert('XSS');\"></IFRAME>");
+        mockRequest.addParameter("18", "18: <iframe src=http://ha.ckers.org/scriptlet.html <");
+        mockRequest.addParameter("19", "19: <INPUT TYPE=\"IMAGE\" SRC=\"javascript:alert('XSS');\">");
+        mockRequest.addParameter("20", "20: <BODY BACKGROUND=\"javascript:alert('XSS')\">");
+        mockRequest.addParameter("21", "21: <LINK REL=\"stylesheet\" HREF=\"javascript:alert('XSS');\">");
+        mockRequest.addParameter("22", "22: <STYLE type=\"text/css\">BODY{background:url(\"javascript:alert('XSS')\")}</STYLE>");
+        mockRequest.addParameter("23", "23: <META HTTP-EQUIV=\"refresh\" CONTENT=\"0;url=javascript:alert('XSS');\">");
+        mockRequest.addParameter("24", "24: \\\";al\''autofocus onfocus=alert(1) onchange=alert(2) onLoad=alert(3) +");
+        mockRequest.addParameter("25", "25: <");
+        mockRequest.addParameter("26", "26: >");
+        mockRequest.addParameter("27", "27: !");
+        mockRequest.addParameter("28", "28: \"");
+        mockRequest.addParameter("29", "29: \'");
+        mockRequest.addParameter("30", "30: +");
+
+        XSSHttpRequest xssRequest = new XSSHttpRequest(mockRequest);
+        xssRequest.setFilterLevel("HIGH");
+
+        idx = 1;
+        Assert.assertEquals("1: 공격 코드 유형은  이며, 단순 HTML인 &lt;title&gt;&#34;이런&#43;&#39;유형&#39;&#61;한글&#33;&#34;&lt;/title&gt;도 있습니다.",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("2: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals(
+                "3: &#61;&#61;]]&gt;&lt;html:html&#43;xmlns:html&#61;&#39;http://www.w3.org/1999/xhtml&#39;&gt;&lt;html:h1&gt;hacked&#43;page&lt;/html:h1&gt;alert(&#39;javascript&#43;test&#39;);&lt;/html:html&gt;&lt;/Tracking&gt;&lt;Tracking&gt;&lt;&#33;[CDATA[]",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals(
+                "4: &#61;&#61;]]&gt;&lt;html:html&#43;xmlns:html&#61;&#39;http://www.w3.org/1999/xhtml&#39;&gt;&lt;html:h1&gt;hacked&#43;page&lt;/html:h1&gt;alert(&#39;javascript&#43;test&#39;);/iframe&gt;&lt;/html:html&gt;&lt;/Tracking&gt;&lt;Tracking&gt;&lt;&#33;[CDATA[]",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("5: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("6: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("7: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("8: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("9: &lt;img src&#61;&#34;\nalert(&#39;test&#39;)&#39; alt&#61;&#39;test&#39;&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("10: &lt;img src&#61;&#34;\nalert(&#39;test&#39;)&#39; alt&#61;&#39;test&#39;&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("11: &lt;IMG SRC&#61;alert(&#34;XSS&#34;)&gt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("12: &lt;IMG SRC&#61;`alert(&#34;RSnake says, &#39;XSS&#39;&#34;)`&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("13: &lt;IMG &#34;&#34;&#34;&gt;&#34;&gt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("14: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("15: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("16: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("17: /IFRAME&gt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("18: ", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("19: &lt;INPUT TYPE&#61;&#34;IMAGE&#34; SRC&#61;&#34;alert(&#39;XSS&#39;);&#34;&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("20: &lt;BODY BACKGROUND&#61;&#34;alert(&#39;XSS&#39;)&#34;&gt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("21: &lt;LINK REL&#61;&#34;stylesheet&#34; HREF&#61;&#34;alert(&#39;XSS&#39;);&#34;&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals(
+                "22: &lt;STYLE type&#61;&#34;text/css&#34;&gt;BODY{background:url(&#34;alert(&#39;XSS&#39;)&#34;)}&lt;/STYLE&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("23: &lt;META HTTP-EQUIV&#61;&#34;refresh&#34; CONTENT&#61;&#34;0;url&#61;alert(&#39;XSS&#39;);&#34;&gt;",
+                xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("24: \\&#34;;al&#39;&#39; alert(1) alert(2) alert(3) &#43;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("25: &lt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("26: &gt;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("27: &#33;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("28: &#34;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("29: &#39;", xssRequest.getParameter("param" + (idx++)));
+        Assert.assertEquals("30: &#43;", xssRequest.getParameter("param" + (idx++)));
+    }
+
+}

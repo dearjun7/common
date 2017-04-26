@@ -1,0 +1,57 @@
+package com.bh.subject.std.common.util;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
+import net.sf.json.JsonConfig;
+
+public class JSONConverter {
+
+    static Map<String, JSONArray> tmpMap = new ConcurrentHashMap<String, JSONArray>();
+
+    /**
+     * @param param
+     * @param valueKey
+     * @return
+     */
+    public static <T> JSONObject listToJsonObject(List<T> param, String valueKey) throws Exception {
+        JSONArray jsonArr = JSONArray.fromObject(param);
+
+        tmpMap.put(valueKey, jsonArr);
+
+        JSONObject obj = JSONObject.fromObject(tmpMap);
+
+        return obj;
+    }
+
+    /**
+     * @param param
+     * @param valueKey
+     * @param objectClass
+     * @return
+     */
+    @SuppressWarnings({"deprecation", "unchecked"})
+    public static <T> List<T> jsonObjectToList(JSONObject param, String valueKey, Class<T> objectClass) throws Exception {
+        JSONArray jsonArr = param.getJSONArray(valueKey);
+
+        return JSONArray.toList(jsonArr, objectClass);
+    }
+
+    /**
+     * @param targetFieldName
+     * @param rootClass
+     * @param childClass
+     * @return
+     */
+    public static JsonConfig getJsonConfig(Class<?> rootClass, Map<String, Class<?>> classMap) {
+        JsonConfig jsonConfig = new JsonConfig();
+
+        jsonConfig.setRootClass(rootClass);
+        jsonConfig.setClassMap(classMap);
+
+        return jsonConfig;
+    }
+}

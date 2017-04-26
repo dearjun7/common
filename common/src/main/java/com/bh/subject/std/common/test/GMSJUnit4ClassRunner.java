@@ -1,0 +1,91 @@
+package com.bh.subject.std.common.test;
+
+import org.junit.runners.model.InitializationError;
+import org.springframework.jdbc.datasource.SimpleDriverDataSource;
+import org.springframework.jndi.JndiTemplate;
+import org.springframework.mock.jndi.SimpleNamingContextBuilder;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+public class GMSJUnit4ClassRunner extends SpringJUnit4ClassRunner {
+
+    private static final String MYSQL_URL = "jdbc:mysql://123.212.190.182:43306/hgms";
+    private static final String MYSQL_USERNAME = "hgms";
+    private static final String MYSQL_PASSWORD = "handygms12#";
+    private static final String DEFAULT_MYSQL_JNDINAME = "java:/comp/env/jdbc/freeDB";
+
+    private static final String ORACLE_URL = "jdbc:oracle:thin:@10.30.4.221:1521:xe";
+    private static final String ORACLE_USERNAME = "test";
+    private static final String ORACLE_PASSWORD = "test1234";
+    private static final String DEFAULT_ORACLE_JNDINAME = "java:/comp/env/jdbc/oracleDB";
+
+    private String mysqlJndiName = null;
+    private String oracleJndiName = null;
+
+    public GMSJUnit4ClassRunner(Class<?> clazz) throws InitializationError {
+        super(clazz);
+
+        if(mysqlJndiName == null) {
+            this.mysqlJndiName = DEFAULT_MYSQL_JNDINAME;
+        }
+        if(oracleJndiName == null) {
+            this.oracleJndiName = DEFAULT_ORACLE_JNDINAME;
+        }
+
+        try {
+            this.bindMySQLJndi();
+            this.bindOracleJndi();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void setMysqlJndiName(String mysqlJndiName) {
+        this.mysqlJndiName = mysqlJndiName;
+
+        try {
+            this.bindMySQLJndi();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void setOracleJndiName(String oracleJndiName) {
+        this.oracleJndiName = oracleJndiName;
+
+        try {
+            this.bindOracleJndi();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void bindMySQLJndi() throws Exception {
+        SimpleNamingContextBuilder builder = new SimpleNamingContextBuilder();
+        SimpleDriverDataSource dataSource = new SimpleDriverDataSource();
+        JndiTemplate jndiTemplate = new JndiTemplate();
+
+        builder.activate();
+
+        dataSource.setDriverClass(com.mysql.jdbc.Driver.class);
+        dataSource.setUrl(MYSQL_URL);
+        dataSource.setUsername(MYSQL_USERNAME);
+        dataSource.setPassword(MYSQL_PASSWORD);
+
+        jndiTemplate.bind(mysqlJndiName, dataSource);
+    }
+
+    private void bindOracleJndi() throws Exception {
+        SimpleNamingContextBuilder builder = new SimpleNamingContextBuilder();
+        SimpleDriverDataSource dataSource = new SimpleDriverDataSource();
+        JndiTemplate jndiTemplate = new JndiTemplate();
+
+        builder.activate();
+
+        dataSource.setDriverClass(oracle.jdbc.OracleDriver.class);
+        dataSource.setUrl(ORACLE_URL);
+        dataSource.setUsername(ORACLE_USERNAME);
+        dataSource.setPassword(ORACLE_PASSWORD);
+
+        jndiTemplate.bind(oracleJndiName, dataSource);
+    }
+}

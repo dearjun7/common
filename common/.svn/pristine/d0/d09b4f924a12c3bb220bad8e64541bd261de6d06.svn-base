@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level  %logger{35} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="fileAppender" class="ch.qos.logback.core.FileAppender">
+		<file>/myLogFile.log</file>
+		<append>true</append>
+		<encoder>
+			<pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level  %logger{35} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="com.SKTelecomcoupon" level="DEBUG" />
+
+	<logger name="com.SKTelecomwallet" level="DEBUG" />
+
+	<logger name="org.springframework.core" level="INFO" />
+	<logger name="org.springframework.beans" level="INFO" />
+	<logger name="org.springframework.context" level="INFO" />
+	<logger name="org.springframework.http" level="TRACE" />
+	<logger name="org.springframework.web" level="TRACE" />
+
+	<root level="INFO">
+		<appender-ref ref="STDOUT" />
+	</root>
+</configuration>

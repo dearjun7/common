@@ -1,0 +1,222 @@
+package com.bh.subject.std.common.service.http;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.message.BasicNameValuePair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import net.sf.json.JSONObject;
+
+/**
+ * 외부 Http, https OpenAPI 호출
+ * 
+ * @author MaJoonChae
+ * @author BH Jun 2016.2.4 refactoring + conncection pool 적용
+ */
+
+@Component
+public class HttpConnector {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpConnector.class);
+
+    @Autowired
+    private HttpClientBuilder httpClientBuilder;
+
+    public String sendPost(String url, Map<String, String> headers, Map<String, String> params, String encoding) throws Exception {
+        CloseableHttpClient httpClient = httpClientBuilder.build();
+        CloseableHttpResponse httpResponse = null;
+        List<NameValuePair> paramList = convertParam(params);
+        HttpPost httpPost = new HttpPost(url);
+        BufferedReader bufferedReader = null;
+        StringBuffer responseBodyString = new StringBuffer();
+
+        this.addHeaders(headers, httpPost);
+
+        LOGGER.debug("POST : " + httpPost.getURI());
+
+        try {
+            httpPost.setEntity(new UrlEncodedFormEntity(paramList, encoding));
+            httpResponse = httpClient.execute(httpPost);
+            bufferedReader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+            String inputLine;
+
+            while((inputLine = bufferedReader.readLine()) != null) {
+                responseBodyString.append(inputLine);
+            }
+
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+            if(httpResponse != null) {
+                httpResponse.close();
+            }
+        }
+
+        return this.replaceResponseStr(responseBodyString);
+    }
+
+    public String sendPut(String url, Map<String, String> headers, Map<String, String> params, String encoding) throws Exception {
+        CloseableHttpClient httpClient = httpClientBuilder.build();
+        CloseableHttpResponse httpResponse = null;
+        List<NameValuePair> paramList = convertParam(params);
+        HttpPut httpPut = new HttpPut(url);
+        BufferedReader bufferedReader = null;
+        StringBuffer responseBodyString = new StringBuffer();
+
+        this.addHeaders(headers, httpPut);
+
+        LOGGER.debug("PUT : " + httpPut.getURI());
+
+        try {
+            httpPut.setEntity(new UrlEncodedFormEntity(paramList, encoding));
+            httpResponse = httpClient.execute(httpPut);
+            bufferedReader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+            String inputLine;
+
+            while((inputLine = bufferedReader.readLine()) != null) {
+                responseBodyString.append(inputLine);
+            }
+
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+            if(httpResponse != null) {
+                httpResponse.close();
+            }
+        }
+
+        return this.replaceResponseStr(responseBodyString);
+    }
+
+    public String sendPut(String url, JSONObject params, String encoding) throws Exception {
+        CloseableHttpClient httpClient = httpClientBuilder.build();
+        CloseableHttpResponse httpResponse = null;
+        HttpPut httpPut = new HttpPut(url);
+        BufferedReader bufferedReader = null;
+        StringBuffer responseBodyString = new StringBuffer();
+        Map<String, String> headers = new HashMap<String, String>();
+
+        headers.put("Content-Type", "application/json");
+
+        this.addHeaders(headers, httpPut);
+
+        LOGGER.debug("PUT : " + httpPut.getURI());
+
+        try {
+            httpPut.setEntity(new StringEntity(params.toString(), encoding));
+            httpResponse = httpClient.execute(httpPut);
+            bufferedReader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+            String inputLine;
+
+            while((inputLine = bufferedReader.readLine()) != null) {
+                responseBodyString.append(inputLine);
+            }
+
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+            if(httpResponse != null) {
+                httpResponse.close();
+            }
+        }
+
+        return this.replaceResponseStr(responseBodyString);
+    }
+
+    public String sendGet(String url, Map<String, String> headers, Map<String, String> params, String encoding) throws Exception {
+        CloseableHttpClient httpClient = httpClientBuilder.build();
+        CloseableHttpResponse httpResponse = null;
+        List<NameValuePair> paramList = convertParam(params);
+        HttpGet httpGet = new HttpGet(url + "?" + URLEncodedUtils.format(paramList, encoding));
+        BufferedReader bufferedReader = null;
+        StringBuffer responseBodyString = new StringBuffer();
+
+        this.addHeaders(headers, httpGet);
+
+        LOGGER.debug("GET : " + httpGet.getURI());
+
+        try {
+            httpResponse = httpClient.execute(httpGet);
+            bufferedReader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+
+            String inputLine;
+
+            while((inputLine = bufferedReader.readLine()) != null) {
+                responseBodyString.append(inputLine);
+            }
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(bufferedReader != null) {
+                bufferedReader.close();
+            }
+            if(httpResponse != null) {
+                httpResponse.close();
+            }
+        }
+
+        return this.replaceResponseStr(responseBodyString);
+    }
+
+    private String replaceResponseStr(StringBuffer responseBodyString) {
+        // 값이 없을 때 리턴 되는 괄호("[]")를 공백("")으로 치환.
+        return responseBodyString.toString().replace("[]", "\"\"");
+    }
+
+    private void addHeaders(Map<String, String> headers, HttpRequestBase httpRequestBase) {
+        if(headers != null && headers.size() > 0) {
+            Set<?> key = headers.keySet();
+            for(Iterator<?> iterator = key.iterator(); iterator.hasNext();) {
+                String keyName = (String) iterator.next();
+                String valueName = headers.get(keyName);
+
+                httpRequestBase.addHeader(keyName, valueName);
+            }
+        }
+    }
+
+    private List<NameValuePair> convertParam(Map<String, String> params) {
+        List<NameValuePair> paramList = null;
+        if(params != null && params.size() > 0) {
+            paramList = new ArrayList<NameValuePair>();
+            Iterator<String> keys = params.keySet().iterator();
+
+            while(keys.hasNext()) {
+                String key = keys.next();
+                paramList.add(new BasicNameValuePair(key, params.get(key).toString()));
+            }
+        }
+
+        return paramList;
+    }
+}

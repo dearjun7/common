@@ -1,0 +1,53 @@
+package com.bh.subject.std.common.dao;
+
+import java.util.Date;
+
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.support.SqlSessionDaoSupport;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+
+import com.bh.subject.std.common.pagination.PaginationQueryParamVO;
+import com.bh.subject.std.common.pagination.PaginationVO;
+import com.bh.subject.std.common.service.bean.SpringApplicationContext;
+
+public abstract class GMSCommonDAO extends SqlSessionDaoSupport {
+
+    @Value("#{config['gms.page.default.size']}")
+    private String defaultPageViewSize;
+    @Value("#{config['gms.common.system.tenantid']}")
+    protected String systemTenantId;
+
+    protected static final String TOTAL_COUNT_FIELD_NM = "totalCountYN";
+
+    @Override
+    @Autowired
+    public void setSqlSessionTemplate(SqlSessionTemplate sqlSessionTemplate) {
+        super.setSqlSessionTemplate(sqlSessionTemplate);
+    }
+
+    protected synchronized String selectSequence(SequenceTable sequenceTable) {
+        String beanName = sequenceTable.toString() + "Sequence";
+        GMSMaxValueIncrementer sequence = (GMSMaxValueIncrementer) SpringApplicationContext.getBean(beanName);
+        return sequence.getNextKeyString();
+    }
+
+    protected Date getNowDate() {
+        java.util.Date utilDate = new java.util.Date();
+
+        return new Date(utilDate.getTime());
+    }
+
+    protected <T> void setPagination(PaginationQueryParamVO<T> queryParamVO, int pageViewSize, int currentPageNum) {
+        PaginationVO pagingVO = new PaginationVO();
+
+        if(pageViewSize == 0) {
+            pageViewSize = Integer.parseInt(this.defaultPageViewSize);
+        }
+
+        pagingVO.setPageViewSize(pageViewSize);
+        pagingVO.setCurrentPageNum(currentPageNum);
+        queryParamVO.setPaginationVO(pagingVO);
+        queryParamVO.setSystemTenantId(systemTenantId);
+    }
+}

@@ -1,0 +1,16 @@
+package com.bh.subject.std.common.service.cache.valuekey;
+
+public enum UserCacheValueKey {
+    USER_PROC_TREE_STATUS_NAME("userProcTreeStatus"),
+    USER_OBJ_TREE_STATUS_NAME("userObjTreeStatus");
+
+    private String valueKey;
+
+    UserCacheValueKey(String param) {
+        this.valueKey = param;
+    }
+
+    public String getValueKey() {
+        return this.valueKey;
+    }
+}

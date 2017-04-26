@@ -1,0 +1,138 @@
+package com.bh.subject.std.common.service.cache.type.key;
+
+/**
+ * GMS API Service에서 사용자 단위로 사용하는 Redis Data에 대한 Key Type Class.
+ * 
+ * @author BH Jun
+ */
+public enum UserCacheKeyType {
+    ISO_INTRO_PROC_TREE_STATUS {
+
+        @Override
+        public String getKeyName(String userId, String parentId) {
+            return this.toString() + ":" + userId + ":" + parentId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    PROC_TREE_STATUS {
+
+        @Override
+        public String getKeyName(String userId, String parentId) {
+            return this.toString() + ":" + userId + ":" + parentId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    OBJ_TREE_STATUS {
+
+        @Override
+        public String getKeyName(String userId, String parentId) {
+            return this.toString() + ":" + userId + ":" + parentId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    ORG_TREE_STATUS {
+
+        @Override
+        public String getKeyName(String userId, String parentId) {
+            return this.toString() + ":" + userId + ":" + parentId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    TMP_MENU_SAVE_DATA {
+
+        @Override
+        public String getKeyName(String userId, String menuId) {
+            return this.toString() + ":" + userId + ":" + menuId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    TMP_FILE_INFO {
+
+        @Override
+        public String getKeyName(String userId, String tmpFileKey) {
+            return this.toString() + ":" + userId + ":" + tmpFileKey;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    MODELER_STATUS {
+
+        @Override
+        public String getKeyName(String userId, String param) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            return this.toString() + ":" + userId;
+        }
+    },
+    MODELER_PROC_DATA {
+
+        @Override
+        public String getKeyName(String userId, String dataType) {
+            return this.toString() + ":" + userId + ":" + dataType;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    MODELER_VALID_RESULT {
+
+        @Override
+        public String getKeyName(String userId, String procId) {
+            return this.toString() + ":" + userId + ":" + procId;
+        }
+
+        @Override
+        public String getKeyName(String userId) {
+            throw new UnsupportedOperationException();
+        }
+
+    };
+
+    /**
+     * UserCacheKeyType의 Key Name을 반환.
+     * 
+     * @param userId
+     *            String
+     * @param param
+     *            String
+     * @return
+     */
+    public abstract String getKeyName(String userId, String param);
+
+    /**
+     * UserCacheKeyType의 Key Name을 반환.
+     * 
+     * @param userId
+     *            String
+     * @return
+     */
+    public abstract String getKeyName(String userId);
+}

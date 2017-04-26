@@ -1,0 +1,596 @@
+package com.hs.gms.std.common.service.reverseproxy;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.hs.gms.std.common.error.CommonErrorCode;
+import com.hs.gms.std.common.error.GMSException;
+
+/**
+ * RequestProxySender
+ * 
+ * @author BH Jun
+ */
+@Component
+public class RequestProxySender {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RequestProxySender.class);
+
+    private static String tmpFilePath;
+
+    @Value("#{config['gms.common.charset']}")
+    protected String encodingCharSet;
+
+    protected static final String HTTP_ENTITY = "httpEntity";
+
+    @Value("#{config['gms.common.proxy.tmp_file_path']}")
+    private void setTmpFilePath(String tmpFilePath) {
+        RequestProxySender.tmpFilePath = tmpFilePath;
+    }
+
+    @Autowired
+    private CloseableHttpClient httpClient;
+
+    public String executeUpload(HttpServletRequest request, String proxyURL) throws GMSException {
+        return this.executeToGetRes(request, null, proxyURL, true);
+    }
+
+    public String executeUpload(File uploadFile, String proxyURL) throws GMSException {
+        CloseableHttpResponse proxyResponse = null;
+        String traceId = UUID.randomUUID().toString();
+        List<File> tmpFileList = new ArrayList<File>();
+        String result = null;
+
+        try {
+            HttpRequestBase httpRequestBase = new HttpPost(proxyURL);
+            MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().addBinaryBody("file", uploadFile);
+            HttpEntity proxyParams = multipartEntityBuilder.build();
+
+            LOGGER.info("requestTraceID : " + traceId + " - ReverseProxy REQUEST : POST(Multipart) - " + proxyURL);
+
+            proxyResponse = this.sendRequest(httpRequestBase, null, proxyParams, traceId);
+            this.checkResponseStatus(proxyResponse.getStatusLine().getStatusCode());
+
+            result = this.getResponseStringBody(proxyResponse.getEntity());
+
+            tmpFileList.add(uploadFile);
+        } catch(Exception ex) {
+            throw new GMSException(ex);
+        } finally {
+            this.deleteProxyTmpFile(tmpFileList);
+
+            try {
+                if(proxyResponse != null) {
+                    proxyResponse.close();
+                }
+            } catch(IOException ie) {
+                throw new GMSException(ie);
+            }
+        }
+        return result;
+    }
+
+    public File executeToGetFile(HttpServletRequest request, HttpMethod httpMethod, String proxyURL) throws Exception {
+        CloseableHttpResponse proxyResponse = null;
+        File result = null;
+
+        try {
+            proxyResponse = this.getResponseByHttpMethod(request, httpMethod, null, proxyURL, false);
+
+            if(proxyResponse.getStatusLine().getStatusCode() == 200) {
+                result = this.getResponseFileBody(proxyResponse.getEntity());
+            }
+        } catch(Exception ex) {
+            throw new GMSException(ex);
+        } finally {
+            try {
+                if(proxyResponse != null) {
+                    proxyResponse.close();
+                }
+            } catch(IOException ie) {
+                throw new GMSException(ie);
+            }
+        }
+        return result;
+    }
+
+    public String executeToGetRes(HttpServletRequest request, HttpMethod httpMethod, String proxyURL, boolean isMultiPart)
+            throws GMSException {
+        return this.executeToGetRes(request, httpMethod, null, proxyURL, isMultiPart);
+    }
+
+    public String executeToGetRes(HttpServletRequest request, HttpMethod httpMethod, HttpEntity httpEntity, String proxyURL,
+            boolean isMultiPart) throws GMSException {
+        CloseableHttpResponse proxyResponse = null;
+        String result = null;
+
+        try {
+            proxyResponse = this.getResponseByHttpMethod(request, httpMethod, httpEntity, proxyURL, isMultiPart);
+
+            result = this.getResponseStringBody(proxyResponse.getEntity());
+        } catch(Exception ex) {
+            throw new GMSException(ex);
+        } finally {
+            try {
+                if(proxyResponse != null) {
+                    proxyResponse.close();
+                }
+            } catch(IOException ie) {
+                throw new GMSException(ie);
+            }
+        }
+        return result;
+    }
+
+    public CloseableHttpResponse executeToGetRes(HttpServletRequest request, HttpMethod httpMethod, String proxyURL) throws Exception {
+        CloseableHttpResponse proxyResponse = null;
+
+        try {
+            proxyResponse = this.getResponseByHttpMethod(request, httpMethod, null, proxyURL, false);
+        } catch(Exception ex) {
+            if(proxyResponse != null) {
+                proxyResponse.close();
+            }
+            throw new GMSException(ex);
+        }
+        return proxyResponse;
+    }
+
+    public void executeToSendRes(HttpServletRequest request, HttpMethod httpMethod, String proxyURL, boolean isMultiPart) throws Exception {
+        this.executeToSendRes(request, httpMethod, proxyURL, isMultiPart, false);
+    }
+
+    public void executeToSendRes(HttpServletRequest request, HttpMethod httpMethod, String proxyURL, boolean isMultiPart, boolean isInLine)
+            throws Exception {
+        CloseableHttpResponse proxyResponse = this.getResponseByHttpMethod(request, httpMethod, null, proxyURL, isMultiPart);
+        HttpServletResponse response = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getResponse();
+
+        this.setResponseHeader(proxyResponse, response, isInLine);
+        //        this.checkResponseStatus(response, request.getContextPath(), proxyResponseStatus);
+        this.setResponseBody(proxyResponse.getEntity(), proxyResponse.getStatusLine().getStatusCode(), response);
+    }
+
+    private CloseableHttpResponse getResponseByHttpMethod(HttpServletRequest request, HttpMethod httpMethod, HttpEntity httpEntity,
+            String proxyURL, boolean isMultiPart) throws GMSException {
+        CloseableHttpResponse proxyResponse = null;
+        List<File> tmpFileList = null;
+
+        try {
+            ProxyRequestVO proxyRequestVO = this.makeProxyRequestData(request, httpMethod, httpEntity, proxyURL, isMultiPart);
+            String traceId = proxyRequestVO.getTraceId();
+            HttpRequestBase httpRequestBase = proxyRequestVO.getHttpRequestBase();
+            Header[] headers = proxyRequestVO.getHeaders();
+            HttpEntity proxyParams = proxyRequestVO.getProxyParams();
+
+            tmpFileList = proxyRequestVO.getTmpFileList();
+
+            LOGGER.info(
+                    "requestTraceID : " + traceId + " - ReverseProxy REQUEST : " + proxyRequestVO.getRequestMethod() + " - " + proxyURL);
+
+            proxyResponse = this.sendRequest(httpRequestBase, headers, proxyParams, traceId);
+            this.checkResponseStatus(proxyResponse.getStatusLine().getStatusCode());
+        } catch(Exception ex) {
+            throw new GMSException(ex);
+        } finally {
+            if(isMultiPart) {
+                this.deleteProxyTmpFile(tmpFileList);
+            }
+        }
+
+        return proxyResponse;
+    }
+
+    private void checkResponseStatus(int statusCode) {
+        if(statusCode == 400) {
+            throw new GMSException(CommonErrorCode.BAD_REQUEST);
+        } else if(statusCode == 404) {
+            throw new GMSException(CommonErrorCode.NOTFOUND);
+        } else if(statusCode == 415) {
+            throw new GMSException(CommonErrorCode.NOT_ACCEPTABLE);
+        } else if(statusCode == 500) {
+            throw new GMSException(CommonErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    protected ProxyRequestVO makeProxyRequestData(HttpServletRequest request, HttpMethod httpMethod, HttpEntity httpEntity, String proxyURL,
+            boolean isMultiPart) throws Exception {
+        String requestMethod = httpMethod == null ? request.getMethod().toUpperCase() : httpMethod.toString();
+        ProxyRequestVO proxyRequestVO = new ProxyRequestVO();
+        String traceId = UUID.randomUUID().toString();
+        HttpEntity proxyParams = null;
+        Header[] headers = null;
+        List<File> tmpFileList = null;
+
+        try {
+            if(isMultiPart) {
+                requestMethod = "MULTI_PART";
+            }
+
+            Map<String, Object> httpParam = HttpReqeustMethodType.valueOf(requestMethod).getHttpEntity(request, encodingCharSet);
+            HttpRequestBase httpRequestBase = HttpReqeustMethodType.valueOf(requestMethod).getHttpRequestBase(proxyURL);
+
+            if(httpEntity != null) {
+                proxyParams = httpEntity;
+            } else {
+                headers = this.getRequestHeaders(request);
+
+                if(!"GET".equals(requestMethod)) {
+                    proxyParams = (HttpEntity) httpParam.get(HTTP_ENTITY);
+                }
+
+                if(isMultiPart) {
+                    tmpFileList = (List<File>) httpParam.get(MethodParamConverter.TMP_FILE_PARAM_NAME);
+                }
+            }
+
+            proxyRequestVO.setTraceId(traceId);
+            proxyRequestVO.setHttpRequestBase(httpRequestBase);
+            proxyRequestVO.setHeaders(headers);
+            proxyRequestVO.setProxyParams(proxyParams);
+            proxyRequestVO.setTmpFileList(tmpFileList);
+            proxyRequestVO.setRequestMethod(requestMethod);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        return proxyRequestVO;
+    }
+
+    protected CloseableHttpResponse sendRequest(HttpRequestBase proxtHttpRequest, Header[] headers, HttpEntity proxyParams, String traceID)
+            throws ClientProtocolException, IOException {
+
+        if(proxtHttpRequest instanceof HttpPost) {
+            HttpPost httpPost = (HttpPost) proxtHttpRequest;
+
+            if(headers != null) {
+                httpPost.setHeaders(headers);
+            }
+            httpPost.setEntity(proxyParams);
+            proxtHttpRequest = httpPost;
+        } else if(proxtHttpRequest instanceof HttpPut) {
+            HttpPut httpPut = (HttpPut) proxtHttpRequest;
+
+            if(headers != null) {
+                httpPut.setHeaders(headers);
+            }
+            httpPut.setEntity(proxyParams);
+            proxtHttpRequest = httpPut;
+        } else {
+            proxtHttpRequest.setHeaders(headers);
+        }
+
+        CloseableHttpResponse proxyResponse = null;
+
+        try {
+            proxyResponse = httpClient.execute(proxtHttpRequest);
+
+            int proxyResponseStatus = proxyResponse.getStatusLine().getStatusCode();
+
+            if(LOGGER.isDebugEnabled()) {
+                for(Header tmpHeader : proxtHttpRequest.getAllHeaders()) {
+                    LOGGER.debug("requestTraceID : " + traceID + " - ReverseProxy REQUEST Header = " + tmpHeader.getName() + ":"
+                            + tmpHeader.getValue());
+                }
+            }
+
+            LOGGER.info("requestTraceID : " + traceID + " - ReverseProxy RESPONSE STATUS : " + proxyResponseStatus);
+        } catch(Exception e) {
+            if(!proxtHttpRequest.isAborted()) {
+                proxtHttpRequest.abort();
+            }
+            throw new GMSException(e);
+        } finally {}
+        return proxyResponse;
+    }
+
+    protected Header[] getRequestHeaders(HttpServletRequest request) {
+        Enumeration<String> reqHeaderNames = request.getHeaderNames();
+        List<Header> headerList = new ArrayList<Header>();
+
+        while(reqHeaderNames.hasMoreElements()) {
+            String headerName = reqHeaderNames.nextElement();
+
+            if("content-length".equals(headerName)) {
+                continue;
+            }
+
+            if("connection".equals(headerName)) {
+                continue;
+            }
+
+            if("cookie".equals(headerName)) {
+                continue;
+            }
+
+            if("cache-control".equals(headerName)) {
+                continue;
+            }
+
+            if("user-agent".equals(headerName)) {
+                continue;
+            }
+
+            headerList.add(new BasicHeader(headerName, request.getHeader(headerName)));
+        }
+
+        Header[] resultHeader = new Header[headerList.size()];
+        resultHeader = headerList.toArray(resultHeader);
+
+        return resultHeader;
+    }
+
+    protected void deleteProxyTmpFile(List<File> tmpFileList) {
+        for(File tmpFile : tmpFileList) {
+            if(tmpFile != null) {
+                if(tmpFile.isFile()) {
+                    tmpFile.delete();
+                }
+            }
+        }
+    }
+
+    private String getResponseStringBody(HttpEntity proxyResponseEntity) throws Exception {
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        StringBuffer sb = new StringBuffer();
+        InputStream inputStream = null;
+
+        if(proxyResponseEntity == null) {
+            return null;
+        }
+
+        try {
+            inputStream = new BufferedInputStream(proxyResponseEntity.getContent());
+
+            while((bytesRead = inputStream.read(buffer)) != -1) {
+                sb.append(new String(buffer, 0, bytesRead));
+            }
+
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(inputStream != null) {
+                inputStream.close();
+            }
+        }
+
+        return sb.toString();
+    }
+
+    private File getResponseFileBody(HttpEntity proxyResponseEntity) throws Exception {
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        InputStream inputStream = null;
+        OutputStream outputStream = null;
+
+        if(proxyResponseEntity == null) {
+            return null;
+        }
+
+        String fileName = UUID.randomUUID().toString().replaceAll("-", "");
+        File tmpDir = new File(tmpFilePath);
+        File result = null;
+
+        if(!tmpDir.isDirectory()) {
+            tmpDir.mkdir();
+        }
+
+        result = new File(tmpFilePath + "/" + fileName);
+
+        try {
+            inputStream = new BufferedInputStream(proxyResponseEntity.getContent());
+            outputStream = new BufferedOutputStream(new FileOutputStream(result));
+
+            while((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+
+        } catch(Exception e) {
+            throw new GMSException(e);
+        } finally {
+            if(outputStream != null) {
+                outputStream.close();
+            }
+            if(inputStream != null) {
+                inputStream.close();
+            }
+        }
+        return result;
+    }
+
+    private void setResponseHeader(CloseableHttpResponse proxyResponse, HttpServletResponse response, boolean isInLine) {
+        for(Header resHeader : proxyResponse.getAllHeaders()) {
+            String headerName = resHeader.getName();
+            String headerValue = resHeader.getValue();
+
+            if("connection".equals(headerName)) {
+                continue;
+            }
+
+            if("Content-Disposition".equals(headerName)) {
+                if(isInLine) {
+                    headerValue = "inline";
+                }
+            }
+
+            response.setHeader(headerName, headerValue);
+        }
+    }
+
+    //    private void checkResponseStatus(HttpServletResponse response, String contextPath, int proxyResponseStatus) throws IOException {
+    //        //4XX 이거나 500 Status 일 경우, 해당 status의 에러 페이지로 redirection
+    //        if(Pattern.matches("4[0-9]{2}|500", String.valueOf(proxyResponseStatus))) {
+    //            response.sendRedirect(contextPath + "/error/" + proxyResponseStatus);
+    //
+    //            return;
+    //        }
+    //
+    //        response.setStatus(proxyResponseStatus);
+    //    }
+
+    private void setResponseBody(HttpEntity proxyResponseEntity, int httpStatusCode, HttpServletResponse response) throws Exception {
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        InputStream inputStream = null;
+        BufferedOutputStream outputStream = null;
+
+        response.setStatus(httpStatusCode);
+
+        if(proxyResponseEntity == null) {
+            LOGGER.debug("Response Body is Empty!!!!!!");
+
+            return;
+        }
+
+        try {
+            response.flushBuffer();
+
+            inputStream = new BufferedInputStream(proxyResponseEntity.getContent());
+            outputStream = new BufferedOutputStream(response.getOutputStream());
+
+            while((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+
+        } catch(Exception e) {
+            throw new Exception(e);
+        } finally {
+            if(outputStream != null) {
+                outputStream.close();
+            }
+            if(inputStream != null) {
+                inputStream.close();
+            }
+        }
+    }
+
+    protected enum HttpReqeustMethodType {
+        GET {
+
+            @Override
+            public HttpRequestBase getHttpRequestBase(String proxyURL) {
+                return new HttpGet(proxyURL);
+            }
+
+            @Override
+            public Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+                return null;
+            }
+
+        },
+        POST {
+
+            @Override
+            public HttpRequestBase getHttpRequestBase(String proxyURL) {
+                return new HttpPost(proxyURL);
+            }
+
+            @Override
+            public Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+                Map<String, Object> result = new HashMap<String, Object>();
+
+                result.put(HTTP_ENTITY, this.makeCommonHttpEntity(request, encodingCharSet));
+                return result;
+            }
+        },
+        PUT {
+
+            @Override
+            public HttpRequestBase getHttpRequestBase(String proxyURL) {
+                return new HttpPut(proxyURL);
+            }
+
+            @Override
+            public Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+                Map<String, Object> result = new HashMap<String, Object>();
+
+                result.put(HTTP_ENTITY, this.makeCommonHttpEntity(request, encodingCharSet));
+                return result;
+            }
+        },
+        DELETE {
+
+            @Override
+            public HttpRequestBase getHttpRequestBase(String proxyURL) {
+                return new HttpDelete(proxyURL);
+            }
+
+            @Override
+            public Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+                Map<String, Object> result = new HashMap<String, Object>();
+
+                result.put(HTTP_ENTITY, this.makeCommonHttpEntity(request, encodingCharSet));
+                return result;
+            }
+        },
+        MULTI_PART {
+
+            @Override
+            public HttpRequestBase getHttpRequestBase(String proxyURL) {
+                return new HttpPost(proxyURL);
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+                Map<String, Object> result = new HashMap<String, Object>();
+                Map<String, Object> params = (Map<String, Object>) MethodParamConverter.MULTI_PART.getMethodParameters(request,
+                        encodingCharSet, tmpFilePath);
+                MultipartEntityBuilder multiPartEntity = (MultipartEntityBuilder) params
+                        .get(MethodParamConverter.ENTITY_BUILDER_PARAM_NAME);
+                List<File> tmpFileList = (List<File>) params.get(MethodParamConverter.TMP_FILE_PARAM_NAME);
+
+                result.put(HTTP_ENTITY, multiPartEntity.build());
+                result.put(MethodParamConverter.TMP_FILE_PARAM_NAME, tmpFileList);
+
+                return result;
+            }
+
+        };
+
+        public abstract HttpRequestBase getHttpRequestBase(String proxyURL);
+
+        public abstract Map<String, Object> getHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception;
+
+        protected HttpEntity makeCommonHttpEntity(HttpServletRequest request, String encodingCharSet) throws Exception {
+            HttpEntity proxyParams = (HttpEntity) MethodParamConverter.POST.getMethodParameters(request, encodingCharSet, null);
+
+            return proxyParams;
+        }
+    }
+}

@@ -1,0 +1,18 @@
+package com.bh.subject.std.common.service.cache.type.key;
+
+/**
+ * LoginFailKeyType.
+ * 
+ * @author BH Jun
+ */
+public enum LoginFailKeyType {
+    LOGIN_FAIL {
+
+        @Override
+        public String getKeyName(String userEmail) {
+            return this.toString() + ":" + userEmail;
+        }
+    };
+
+    public abstract String getKeyName(String userEmail);
+}

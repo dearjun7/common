@@ -1,0 +1,178 @@
+package com.hs.gms.std.common.security.cors;
+
+import java.io.IOException;
+
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+
+public class CORSFilter implements Filter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CORSFilter.class);
+
+    private FilterConfig filterConfig;
+
+    @Value("#{config['gms.common.web.domain']}")
+    private String defaultOriginDomain;
+    @Value("#{config['gms.common.api.domain']}")
+    private String apiDomain;
+
+    @Autowired
+    private CORSOriginDAO corsOriginDAO;
+
+    private String accessControlAllowMethods;
+    private String accessControlMaxAge;
+    private String accessControlAllowHeaders;
+    private String accessControlAllowOrigin;
+    private String accessControlAllowCredentials;
+
+    public String getAccessControlAllowMethods() {
+        return accessControlAllowMethods;
+    }
+
+    public void setAccessControlAllowMethods(String accessControlAllowMethods) {
+        this.accessControlAllowMethods = accessControlAllowMethods;
+    }
+
+    public String getAccessControlMaxAge() {
+        return accessControlMaxAge;
+    }
+
+    public void setAccessControlMaxAge(String accessControlMaxAge) {
+        this.accessControlMaxAge = accessControlMaxAge;
+    }
+
+    public String getAccessControlAllowHeaders() {
+        return accessControlAllowHeaders;
+    }
+
+    public void setAccessControlAllowHeaders(String accessControlAllowHeaders) {
+        this.accessControlAllowHeaders = accessControlAllowHeaders;
+    }
+
+    public String getAccessControlAllowOrigin() {
+        return accessControlAllowOrigin;
+    }
+
+    public void setAccessControlAllowOrigin(String accessControlAllowOrigin) {
+        this.accessControlAllowOrigin = accessControlAllowOrigin;
+    }
+
+    public String getAccessControlAllowCredentials() {
+        return accessControlAllowCredentials;
+    }
+
+    public void setAccessControlAllowCredentials(String accessControlAllowCredentials) {
+        this.accessControlAllowCredentials = accessControlAllowCredentials;
+    }
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        this.filterConfig = filterConfig;
+    }
+    //    @Override
+    //    public void init(FilterConfig filterConfig) throws ServletException {
+    //        this.filterConfig = filterConfig;
+    //
+    //        this.accessControlAllowMethods = filterConfig.getInitParameter("allowMethods");
+    //        this.accessControlMaxAge = filterConfig.getInitParameter("maxAge");
+    //        this.accessControlAllowHeaders = filterConfig.getInitParameter("allowHeaders");
+    //        //        this.accessControlAllowOrigin = filterConfig.getInitParameter("allowOrigin");
+    //        this.accessControlAllowCredentials = filterConfig.getInitParameter("allowCredentials");
+    //
+    //        LOGGER.info("=================CORS Filter Configuration infomation==================");
+    //        LOGGER.info("accessControlAllowMethods     : " + accessControlAllowMethods);
+    //        LOGGER.info("accessControlMaxAge           : " + accessControlMaxAge);
+    //        LOGGER.info("accessControlAllowHeaders     : " + accessControlAllowHeaders);
+    //        //        LOGGER.info("accessControlAllowOrigin      : " + accessControlAllowOrigin);
+    //        LOGGER.info("accessControlAllowCredentials : " + accessControlAllowCredentials);
+    //    }
+
+    @Override
+    public void destroy() {
+        this.filterConfig = null;
+    }
+
+    /**
+     * FilterConfig를 반환한다.
+     * 
+     * @return the FilterConfig instance 또는 없을 경우, <code>null</code>
+     * @see javax.servlet.GenericServlet#getServletConfig()
+     */
+    public final FilterConfig getFilterConfig() {
+        return this.filterConfig;
+    }
+
+    /**
+     * 현재 Filter의 name을 반환한다.
+     * 
+     * @return the filter name 또는 없을 경우, <code>null</code>.
+     * @see javax.servlet.GenericServlet#getServletName()
+     * @see javax.servlet.FilterConfig#getFilterName()
+     */
+    public final String getFilterName() {
+        return this.filterConfig != null ? this.filterConfig.getFilterName() : null;
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletResponse res = (HttpServletResponse) response;
+        HttpServletRequest req = (HttpServletRequest) request;
+        String originDomain = this.getOriginDomain(req);
+
+        LOGGER.debug("api call REFERER : " + originDomain);
+
+        boolean isAllowedCorsOrigin = true;
+
+        if(!originDomain.equals(apiDomain)) {
+            isAllowedCorsOrigin = corsOriginDAO.selectIsCORSOrigin(originDomain);
+        }
+
+        LOGGER.debug("api call isAllowedCorsOrigin : " + isAllowedCorsOrigin);
+
+        if(isAllowedCorsOrigin) {
+            res.setHeader("Access-Control-Allow-Methods", accessControlAllowMethods);
+            res.setHeader("Access-Control-Max-Age", accessControlMaxAge);
+            res.setHeader("Access-Control-Allow-Headers", accessControlAllowHeaders);
+            res.setHeader("Access-Control-Allow-Origin", accessControlAllowOrigin);
+            res.setHeader("Access-Control-Allow-Credentials", accessControlAllowCredentials);
+            res.setHeader("Access-Control-Allow-Origin", originDomain);
+        } else {
+            res.sendError(403);
+        }
+
+        chain.doFilter(request, response);
+    }
+
+    private String getOriginDomain(HttpServletRequest request) {
+        String result = null;
+        String origin = request.getHeader("Origin");
+
+        if("OPTIONS".equals(request.getMethod())) {
+            result = origin;
+        } else {
+            String referer = request.getHeader("referer");
+            String tmpResult = null;
+
+            if(origin == null || "".equals(origin)) {
+                tmpResult = referer != null && !"".equals(referer) ? referer.substring(0, referer.indexOf("/", 8)) : null;
+            } else {
+                tmpResult = origin;
+            }
+
+            result = tmpResult == null || "".equals(tmpResult) ? defaultOriginDomain : tmpResult;
+        }
+
+        return result;
+    }
+}

@@ -1,0 +1,161 @@
+package com.bh.subject.std.common.service.cache;
+
+import java.util.Iterator;
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.bh.subject.std.common.service.cache.operations.RedisOperations;
+import com.bh.subject.std.common.service.cache.type.bucket.BucketType;
+import com.bh.subject.std.common.service.cache.type.key.UserSessionKeyType;
+
+import net.sf.json.JSONObject;
+
+/**
+ * Login된 사용자 정보 Redis Data를 입력(or 갱신)/삭제/반환 하는 기능을 제공하는 Class.
+ * 
+ * @author BH Jun
+ */
+@Component
+public class UserSessionAccessor {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserSessionAccessor.class);
+    private static final String USER_DATA_TYPE = UserSessionKeyType.USER_DATA.getKeyName();
+
+    @Autowired
+    private RedisOperations redisOperations;
+
+    /**
+     * 사용자 로그인 정보에 접근하기 위한 Redis BucketId 정보 반환.
+     * 
+     * @param claim
+     *            JSONObject
+     * @return String
+     * @throws Exception
+     */
+    public String getAccountBucketId(JSONObject claim) throws Exception {
+        LOGGER.debug(claim.toString());
+
+        return BucketType.USER_SESSION.getBucketId((String) claim.get("tenantId"), (String) claim.get("deviceType"),
+                (String) claim.get("userId"));
+    }
+
+    /**
+     * 사용자 로그인 정보에 접근하기 위한 Redis BucketId 정보 반환.
+     * 
+     * @param tenantId
+     *            String
+     * @param deviceType
+     *            String
+     * @param userId
+     *            String
+     * @return String
+     * @throws Exception
+     */
+    public String getAccountBucketId(String tenantId, String deviceType, String userId) throws Exception {
+        return BucketType.USER_SESSION.getBucketId(tenantId, deviceType, userId);
+    }
+
+    /**
+     * Redis에 User Data 정보 존재 유무 확인 후 결과 반환.
+     * 
+     * @param bucketId
+     *            String
+     * @return
+     */
+    public boolean hasUserData(String bucketId) {
+        return redisOperations.hasKey(bucketId, USER_DATA_TYPE);
+    }
+
+    /**
+     * Redis에 저장된 User Session 정보 반환.
+     * 
+     * @param claim
+     *            JSONObject
+     * @return JSONObject
+     * @throws Exception
+     */
+    public JSONObject getUserData(JSONObject claim) throws Exception {
+        String bucketId = getAccountBucketId(claim);
+        String userSessionData = redisOperations.getData(bucketId, USER_DATA_TYPE);
+
+        return JSONObject.fromObject(userSessionData);
+    }
+
+    /**
+     * Redis에 저장된 User Session 정보 반환.
+     * 
+     * @param bucketId
+     *            String
+     * @return JSONObject
+     * @throws Exception
+     */
+    public JSONObject getUserData(String bucketId) throws Exception {
+        String userSessionData = redisOperations.getData(bucketId, USER_DATA_TYPE);
+
+        return JSONObject.fromObject(userSessionData);
+    }
+
+    /**
+     * 로그인 된 User Data를 Redis에 저장.
+     * 
+     * @param bucketId
+     *            String
+     * @param value
+     *            String
+     */
+    public void setUserData(String bucketId, String value) {
+        redisOperations.setData(bucketId, USER_DATA_TYPE, value);
+    }
+
+    /**
+     * User Data의 삭제 만료 시간 설정.(expireTIme 단위 = millisecond)
+     * 
+     * @param bucketId
+     *            String
+     * @param expireTime
+     *            long
+     */
+    public void setExpireTimeUserData(String bucketId, long expireTime) {
+        redisOperations.setBucketExpireTime(bucketId, expireTime);
+    }
+
+    /**
+     * 로그인된 User Data 삭제
+     * 
+     * @param bucketId
+     *            String
+     * @throws Exception
+     */
+    public void removeUserData(String bucketId) throws Exception {
+        redisOperations.deleteBucket(bucketId);
+    }
+
+    /**
+     * 로그인된 User Data 삭제
+     * 
+     * @param claim
+     *            JSONObject
+     * @throws Exception
+     */
+    public void removeUserData(JSONObject claim) throws Exception {
+        redisOperations.deleteBucket(getAccountBucketId(claim));
+    }
+
+    /**
+     * @param tenantId
+     * @throws Exception
+     */
+    public void removeUserDataListInTenant(String tenantId) throws Exception {
+        String bucketPattern = this.getAccountBucketId(tenantId, "*", null);
+        Set<String> userKeys = redisOperations.getKeys(bucketPattern);
+        Iterator<String> iter = userKeys.iterator();
+
+        while(iter.hasNext()) {
+            this.removeUserData(iter.next());
+        }
+    }
+}

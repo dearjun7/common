@@ -1,0 +1,18 @@
+package com.hs.gms.std.common.service.cache.type.key;
+
+/**
+ * Login된 사용자 정보 Redis Data에 대한 Key Type Class.
+ * 
+ * @author BH Jun
+ */
+public enum UserSessionKeyType {
+    USER_DATA {
+
+        @Override
+        public String getKeyName() {
+            return this.toString();
+        }
+    };
+
+    public abstract String getKeyName();
+}

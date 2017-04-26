@@ -1,0 +1,115 @@
+/**
+ * 
+ */
+
+package com.hs.gms.std.common.security.xss;
+
+import static org.junit.Assert.assertEquals;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockFilterConfig;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+
+/**
+ * @author Administrator
+ */
+public class TestXSSFilter {
+
+    private XSSFilter xssFilter;
+
+    /**
+     * @throws java.lang.Exception
+     */
+    @Before
+    public void setUp() throws Exception {
+        xssFilter = new XSSFilter();
+    }
+
+    /**
+     * Test method for
+     * {@link com.SKTelecomwallet.cdf.library.common.security.XSSFilter#doFilter(javax.servlet.ServletRequest, javax.servlet.ServletResponse, javax.servlet.FilterChain)}
+     * .
+     * 
+     * @throws ServletException
+     * @throws IOException
+     */
+    @Test
+    public void testXSSFilterHighLevel() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setParameter("param1", "<script>alert(\"test\");</script>");
+        request.setParameter("param2", "공격 코드 유형은 <script>alert(\"test\");</script> 이며, 단순 HTML인 <title>\"이런+'유형'=한글!\"</title>도 있습니다.");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        MockFilterConfig filterConfig = new MockFilterConfig("XSS_FILTER");
+        filterConfig.addInitParameter("level", "HIGH");
+
+        xssFilter.init(filterConfig);
+        xssFilter.doFilter(request, response, chain);
+
+        assertEquals("", chain.getRequest().getParameter("param1"));
+        assertEquals("공격 코드 유형은  이며, 단순 HTML인 &lt;title&gt;&#34;이런&#43;&#39;유형&#39;&#61;한글&#33;&#34;&lt;/title&gt;도 있습니다.",
+                chain.getRequest().getParameter("param2"));
+    }
+
+    /**
+     * Test method for
+     * {@link com.SKTelecomwallet.cdf.library.common.security.XSSFilter#doFilter(javax.servlet.ServletRequest, javax.servlet.ServletResponse, javax.servlet.FilterChain)}
+     * .
+     * 
+     * @throws ServletException
+     * @throws IOException
+     */
+    @Test
+    public void testXSSFilterLowLevel() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setParameter("param1", "<script>alert(\"test\");</script>");
+        request.setParameter("param2", "공격 코드 유형은 <script>alert(\"test\");</script> 이며, 단순 HTML인 <title>\"이런+'유형'=한글!\"</title>도 있습니다.");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        MockFilterConfig filterConfig = new MockFilterConfig("XSS_FILTER");
+        filterConfig.addInitParameter("level", "LOW");
+
+        xssFilter.init(filterConfig);
+        xssFilter.doFilter(request, response, chain);
+
+        assertEquals("", chain.getRequest().getParameter("param1"));
+        assertEquals("공격 코드 유형은  이며, 단순 HTML인 &lt;title&gt;\"이런+'유형'=한글!\"&lt;/title&gt;도 있습니다.",
+                chain.getRequest().getParameter("param2"));
+    }
+
+    /**
+     * Test method for
+     * {@link com.SKTelecomwallet.cdf.library.common.security.XSSFilter#doFilter(javax.servlet.ServletRequest, javax.servlet.ServletResponse, javax.servlet.FilterChain)}
+     * .
+     * 
+     * @throws ServletException
+     * @throws IOException
+     */
+    @Test
+    public void testXSSFilterEmptyLevel() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setParameter("param1", "<script>alert(\"test\");</script>");
+        request.setParameter("param2", "공격 코드 유형은 <script>alert(\"test\");</script> 이며, 단순 HTML인 <title>\"이런+'유형'=한글!\"</title>도 있습니다.");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        MockFilterConfig filterConfig = new MockFilterConfig("XSS_FILTER");
+
+        xssFilter.init(filterConfig);
+        xssFilter.doFilter(request, response, chain);
+
+        assertEquals("", chain.getRequest().getParameter("param1"));
+        assertEquals("공격 코드 유형은  이며, 단순 HTML인 &lt;title&gt;&#34;이런&#43;&#39;유형&#39;&#61;한글&#33;&#34;&lt;/title&gt;도 있습니다.",
+                chain.getRequest().getParameter("param2"));
+    }
+
+}

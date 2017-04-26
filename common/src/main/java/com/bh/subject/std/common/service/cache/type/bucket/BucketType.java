@@ -1,0 +1,141 @@
+package com.bh.subject.std.common.service.cache.type.bucket;
+
+/**
+ * Redis에 저장되는 Data의 Bucket(Data 접근을 위한 최상위 Key) Type class.
+ * 
+ * @author BH Jun
+ */
+public enum BucketType {
+    USER_SESSION {
+
+        @Override
+        public String getBucketId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            return this.toString() + ":" + tenantId + ":" + deviceType + (userId != null ? ":" + userId : "");
+        }
+    },
+    USER_OTP {
+
+        @Override
+        public String getBucketId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String accessOTP) {
+            return this.toString() + ":" + accessOTP;
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            throw new UnsupportedOperationException();
+        }
+
+    },
+    USER_CACHE {
+
+        @Override
+        public String getBucketId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId) {
+            return this.toString() + ":" + tenantId;
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    TENANT_CACHE {
+
+        @Override
+        public String getBucketId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId) {
+            return this.toString() + ":" + tenantId;
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    SYSTEM_DATA {
+
+        @Override
+        public String getBucketId() {
+            return this.toString();
+        }
+
+        @Override
+        public String getBucketId(String tenantId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            throw new UnsupportedOperationException();
+        }
+    },
+    LOGIN_FAIL {
+
+        @Override
+        public String getBucketId() {
+            return this.toString();
+        }
+
+        @Override
+        public String getBucketId(String authId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String getBucketId(String tenantId, String deviceType, String userId) {
+            throw new UnsupportedOperationException();
+        }
+    };
+
+    /**
+     * BucketType의 BucketId을 반환.
+     * 
+     * @return String
+     */
+    public abstract String getBucketId();
+
+    /**
+     * BucketType의 BucketId을 반환.
+     * 
+     * @param tenantId
+     *            String
+     * @return String
+     */
+    public abstract String getBucketId(String tenantId);
+
+    /**
+     * BucketType의 BucketId을 반환.
+     * 
+     * @param tenantId
+     *            String
+     * @param deviceType
+     *            String
+     * @param userId
+     *            String
+     * @return String
+     */
+    public abstract String getBucketId(String tenantId, String deviceType, String userId);
+}
